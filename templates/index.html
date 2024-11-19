@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .search-container {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 300px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .ip-display {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .chat-container {
+            display: none;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .messages {
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .sent {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .received {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+        #message-input {
+            width: calc(100% - 100px);
+            margin-right: 10px;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+            margin: 10px 0;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Chat Application</h1>
+        
+        <div class="ip-display">
+            <h3>Your IP Address:</h3>
+            <p>{{ ip_address }}</p>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="ip-input" placeholder="Enter IP address to connect...">
+            <button onclick="connectToUser()">Connect</button>
+        </div>
+
+        <div class="chat-container" id="chat-container">
+            <div class="status" id="status"></div>
+            <div class="messages" id="messages"></div>
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Type your message...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentRoom = null;
+
+        function connectToUser() {
+            const ipAddress = document.getElementById('ip-input').value;
+            if (ipAddress) {
+                socket.emit('connect_request', { target_ip: ipAddress });
+                updateStatus('Connecting...');
+            } else {
+                alert('Please enter an IP address');
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        function showChat() {
+            document.getElementById('chat-container').style.display = 'block';
+        }
+
+        function addMessage(message, isSent) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageDiv.textContent = message;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (message && currentRoom) {
+                socket.emit('send_message', { room: currentRoom, message: message });
+                addMessage(message, true);
+                input.value = '';
+            }
+        }
+
+        // Socket event listeners
+        socket.on('waiting_for_peer', () => {
+            updateStatus('Waiting for peer to connect...');
+        });
+
+        socket.on('connection_request', (data) => {
+            currentRoom = data.room;
+            socket.emit('accept_connection', { room: currentRoom });
+            updateStatus('Connected!');
+            showChat();
+        });
+
+        socket.on('connection_success', (data) => {
+            currentRoom = data.room;
+            updateStatus('Connected!');
+            showChat();
+        });
+
+        socket.on('new_message', (data) => {
+            addMessage(data.message, false);
+        });
+
+        // Add enter key support for sending messages
+        document.getElementById('message-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 
